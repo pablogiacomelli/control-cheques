@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Cheques · MAHRA / ARJE</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#0f1420; --card:#171e2e; --card2:#1d2537; --line:#2a3550;
+    --tx:#e7ecf5; --mut:#93a0bb; --acc:#4f8cff; --ok:#3fd08a; --warn:#f5b64b; --err:#f2685f; --pur:#a98bff; --teal:#39d3c0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.45;padding:26px 18px 80px}
+  .wrap{max-width:1160px;margin:0 auto}
+  header h1{font-size:22px;margin:0 0 4px}
+  header p{color:var(--mut);margin:0 0 14px;font-size:13.5px}
+  .periodbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:11px 14px;margin-bottom:14px;position:sticky;top:10px;z-index:6}
+  .periodbar select{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:13px}
+  .periodbar .spacer{flex:1}
+  .nav{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:8px;width:34px;height:34px;font-size:16px;cursor:pointer;line-height:1}
+  .nav:hover{border-color:var(--acc)}
+  .tabs{display:flex;gap:6px;margin:0 0 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tabs button{background:transparent;border:none;border-bottom:2px solid transparent;padding:10px 15px;font-size:13.5px;color:var(--mut);font-weight:600;margin-bottom:-1px;cursor:pointer}
+  .tabs button.active{color:var(--tx);border-bottom-color:var(--acc)}
+  .panel[hidden]{display:none}
+  .filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+  .filterbar select,.filterbar input{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12.5px;max-width:170px}
+  .filterbar .lbl{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
+  .filterbar .clr{margin-left:auto;background:var(--card2);border:1px solid var(--line);color:var(--mut);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+  .filterbar .clr:hover{border-color:var(--err);color:var(--err)}
+  /* multi-select */
+  .ms{position:relative;display:inline-block}
+  .ms-btn{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12.5px;cursor:pointer;min-width:110px;text-align:left}
+  .ms-btn:hover{border-color:var(--acc)}
+  .ms-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:12;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:6px;min-width:180px;max-height:260px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .ms-item{display:flex;align-items:center;gap:7px;padding:5px 7px;font-size:12.5px;border-radius:6px;cursor:pointer;white-space:nowrap}
+  .ms-item:hover{background:var(--card)}
+  .ms-item input{accent-color:var(--acc);cursor:pointer}
+  .rs-h{font-size:13.5px;font-weight:600;margin:20px 0 8px;color:var(--tx);border-left:3px solid var(--acc);padding-left:8px}
+  tr.pt-full td{background:rgba(79,140,255,.18)!important;color:#cfe0ff}
+  #tblRes1,#tblRes2,#tblRes3,#tblDiarios{margin-bottom:6px}
+  td.neg{color:var(--err)}
+  .alerts{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .alert{flex:1;min-width:170px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--card)}
+  .alert .a-t{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .alert .a-v{font-size:18px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+  .alert .a-n{font-size:10.5px;color:var(--mut);margin-top:1px}
+  .alert.venc{border-color:var(--err)} .alert.venc .a-v{color:var(--err)}
+  .alert.prox{border-color:var(--warn)} .alert.prox .a-v{color:var(--warn)}
+  .alert.pag .a-v{color:var(--ok)} .alert.acor .a-v{color:var(--teal)} .alert.rech .a-v{color:var(--err)} .alert.ped .a-v{color:var(--warn)}
+  .alert.mes .a-v{color:var(--acc)} .alert.sinv .a-v{color:var(--tx)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--mut);font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:hover td{background:var(--card)}
+  .chq{font-weight:600;font-size:13.5px}
+  .chq .sub{display:block;color:var(--mut);font-size:10.5px;font-weight:500;letter-spacing:.2px;margin-top:1px}
+  .badge{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:5px;margin-left:6px;vertical-align:middle;text-transform:uppercase}
+  .b-echeq{background:rgba(79,140,255,.16);color:#9dc0ff;border:1px solid #33507f}
+  .b-fisico{background:rgba(169,139,255,.16);color:#c9b6ff;border:1px solid #5b4b8f}
+  .b-temp{background:rgba(57,211,192,.14);color:#8ef0e5;border:1px solid #2c7a72}
+  .ref{color:var(--tx);font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+  .vto{text-align:center;font-variant-numeric:tabular-nums;color:var(--mut)}
+  .vto .d{font-weight:600;color:var(--tx)}
+  .vto.venc .d{color:var(--err)}
+  .vto.prox .d{color:var(--warn)}
+  .st-sel{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12.5px;font-weight:600;cursor:pointer;min-width:135px;color:var(--tx);background:var(--card2)}
+  .st-emitido{background:rgba(147,160,187,.14);border-color:#3a4463;color:#c4cee2}
+  .st-pagado{background:rgba(63,208,138,.20);border-color:var(--ok);color:#9ff0c6}
+  .st-rechazado{background:rgba(242,104,95,.18);border-color:var(--err);color:#ffb3ad}
+  .st-pedido{background:rgba(245,182,75,.18);border-color:var(--warn);color:#ffd98a}
+  .st-acordado{background:rgba(57,211,192,.18);border-color:var(--teal);color:#8ef0e5}
+  .mot-sel{border:1px solid var(--line);border-radius:8px;padding:5px 7px;font-size:11.5px;cursor:pointer;min-width:135px;color:var(--tx);background:var(--card2);margin-top:5px}
+  .fch-in{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;color-scheme:dark;width:140px}
+  .fch-in:focus{outline:none;border-color:var(--acc)}
+  .chk{width:17px;height:17px;accent-color:var(--acc);cursor:pointer}
+  tfoot td{font-weight:700;border-top:2px solid var(--line);border-bottom:none;background:var(--card)}
+  .tot-lbl{text-align:right;color:var(--mut);font-weight:600}
+  .sums{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin:2px 0 12px}
+  .sums b{color:var(--tx);font-variant-numeric:tabular-nums}
+  .miniprog{height:8px;width:150px;background:var(--card2);border-radius:5px;overflow:hidden}
+  .miniprog>div{height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--ok))}
+  .msg{color:var(--mut);font-size:12.5px;padding:10px 2px}
+  .foot{color:var(--mut);font-size:11.5px;text-align:center;margin-top:24px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--ok);
+    color:#9ff0c6;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
+  .toast.show{opacity:1}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .kpi .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .kpi .v{font-size:19px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .kpi.good .v{color:var(--ok)} .kpi.bad .v{color:var(--err)} .kpi.warnv .v{color:var(--warn)} .kpi.acc .v{color:var(--acc)} .kpi.teal .v{color:var(--teal)}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .chartbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+  .chartbox h3{margin:0 0 10px;font-size:13.5px;font-weight:600}
+  .chartbox .cv{position:relative;height:250px}
+  .chartbox.wide{grid-column:1 / -1}
+  @media(max-width:720px){.charts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Control de Cheques — MAHRA / ARJE</h1>
+    <p>Cheques emitidos a proveedores. Vista por mes de <b>fecha de pago</b>, con alertas de vencimiento y estados. Fuente: pestaña CHEQUES de tu planilla de control.</p>
+  </header>
+
+  <div class="periodbar">
+    <button class="nav" onclick="stepMonth(-1)" title="Mes anterior">‹</button>
+    <select id="selMes"></select>
+    <select id="selAnio"></select>
+    <button class="nav" onclick="stepMonth(1)" title="Mes siguiente">›</button>
+    <span class="spacer"></span>
+    <button class="nav" style="width:auto;padding:0 12px" onclick="loadLive()" title="Actualizar desde la planilla">↻</button>
+  </div>
+
+  <div class="tabs">
+    <button id="tb-mes" class="active" onclick="showTab('mes')">Cheques del mes</button>
+    <button id="tb-todos" onclick="showTab('todos')">Todos</button>
+    <button id="tb-rech" onclick="showTab('rech')">Rechazados / Acuerdos</button>
+    <button id="tb-inf" onclick="showTab('informe')">Informe</button>
+    <button id="tb-diarios" onclick="showTab('diarios')">Cheques diarios</button>
+    <button id="tb-resumen" onclick="showTab('resumen')">Resumen</button>
+    <button id="tb-temporada" onclick="showTab('temporada')">Pagos de Temporada</button>
+  </div>
+
+  <!-- ===================== CHEQUES DEL MES ===================== -->
+  <div id="panel-mes" class="panel">
+    <div class="filterbar">
+      <span class="lbl">Proveedor</span><div class="ms" id="m_prov"></div>
+      <span class="lbl">Clase</span><div class="ms" id="m_clase"></div>
+      <span class="lbl">Estado</span><div class="ms" id="m_estado"></div>
+      <span class="lbl">Banco</span><div class="ms" id="m_banco"></div>
+      <button class="clr" onclick="clearFilters('m')">Limpiar</button>
+    </div>
+    <div class="alerts">
+      <div class="alert venc"><div class="a-t">Vencidos sin pagar (a hoy)</div><div class="a-v" id="alVenc">$0</div><div class="a-n" id="alVencN">0 cheques</div></div>
+      <div class="alert prox"><div class="a-t">Vencen en 7 días</div><div class="a-v" id="alProx">$0</div><div class="a-n" id="alProxN">0 cheques</div></div>
+      <div class="alert mes"><div class="a-t">Total del mes</div><div class="a-v" id="alMes">$0</div><div class="a-n" id="alMesN">0 cheques</div></div>
+    </div>
+    <div class="sums">
+      <span>Pagados <b id="cntPag">0 / 0</b></span>
+      <span class="miniprog"><div id="fillPag"></div></span>
+      <span>Pagado del mes <b id="totPag">$0</b></span>
+      <span>Pendiente del mes <b id="totPend">$0</b></span>
+    </div>
+    <div id="msgMes" class="msg">Cargando cheques…</div>
+    <table id="tblMes" hidden>
+      <thead><tr>
+        <th>Cheque</th>
+        <th style="width:135px;text-align:right">Monto</th>
+        <th style="width:85px;text-align:center">Fecha pago</th>
+        <th style="width:160px">Estado</th>
+        <th style="width:150px">Fecha débito</th>
+        <th style="width:60px;text-align:center" title="Pasado en el sistema (EcommApp)">Sist.</th>
+      </tr></thead>
+      <tbody id="bodyMes"></tbody>
+      <tfoot><tr><td class="tot-lbl">Total del mes</td><td class="ref" id="footMes">$0</td><td colspan="4"></td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- ===================== TODOS ===================== -->
+  <div id="panel-todos" class="panel" hidden>
+    <div class="filterbar">
+      <span class="lbl">Temp. pago</span><div class="ms" id="t_temp"></div>
+      <span class="lbl">Mes</span><div class="ms" id="t_mes"></div>
+      <span class="lbl">Año</span><div class="ms" id="t_anio"></div>
+      <span class="lbl">Tipo</span><div class="ms" id="t_tipo"></div>
+      <span class="lbl">Proveedor</span><div class="ms" id="t_prov"></div>
+      <span class="lbl">Banco</span><div class="ms" id="t_banco"></div>
+      <span class="lbl">Estado</span><div class="ms" id="t_estado"></div>
+      <span class="lbl">Clase</span><div class="ms" id="t_clase"></div>
+      <span class="lbl">N°</span><input id="t_buscar" placeholder="n°…" style="width:90px">
+      <button class="clr" onclick="clearFilters('t')">Limpiar</button>
+    </div>
+    <div class="alerts">
+      <div class="alert venc"><div class="a-t">Vencidos sin pagar</div><div class="a-v" id="tVenc">$0</div><div class="a-n" id="tVencN">0</div></div>
+      <div class="alert pag"><div class="a-t">Total pagados</div><div class="a-v" id="tPag">$0</div><div class="a-n" id="tPagN">0</div></div>
+      <div class="alert rech"><div class="a-t">Total rechazados</div><div class="a-v" id="tRech">$0</div><div class="a-n" id="tRechN">0</div></div>
+      <div class="alert acor"><div class="a-t">Total acordados</div><div class="a-v" id="tAcor">$0</div><div class="a-n" id="tAcorN">0</div></div>
+      <div class="alert ped"><div class="a-t">Pedido de acuerdo</div><div class="a-v" id="tPed">$0</div><div class="a-n" id="tPedN">0</div></div>
+      <div class="alert sinv"><div class="a-t">A pagar sin vencer</div><div class="a-v" id="tSinV">$0</div><div class="a-n" id="tSinVN">0</div></div>
+    </div>
+    <div class="sums"><span>Mostrando <b id="cntTodos">0</b> cheques</span><span>Suma <b id="sumTodos">$0</b></span></div>
+    <table id="tblTodos">
+      <thead><tr>
+        <th>Cheque</th>
+        <th style="width:135px;text-align:right">Monto</th>
+        <th style="width:85px;text-align:center">Fecha pago</th>
+        <th style="width:160px">Estado</th>
+        <th style="width:150px">Fecha débito</th>
+        <th style="width:60px;text-align:center">Sist.</th>
+      </tr></thead>
+      <tbody id="bodyTodos"></tbody>
+    </table>
+  </div>
+
+  <!-- ===================== RECHAZADOS / ACUERDOS ===================== -->
+  <div id="panel-rech" class="panel" hidden>
+    <p class="msg">Cheques con problemas de pago, tomados de los estados que marcás en este panel: <b>Rechazado</b>, <b>Pedido de Acuerdo</b> y <b>Acordado</b> (el acordado cuenta como pagado).</p>
+    <div class="filterbar">
+      <span class="lbl">Estado</span><div class="ms" id="r_estado"></div>
+      <span class="lbl">Temp. pago</span><div class="ms" id="r_temp"></div>
+      <span class="lbl">Motivo</span><div class="ms" id="r_motivo"></div>
+      <button class="clr" onclick="clearFilters('r')">Limpiar</button>
+    </div>
+    <div class="sums"><span>Rechazados <b id="rRechN">0</b></span><span>Pedido de acuerdo <b id="rPedN">0</b></span><span>Acordados <b id="rAcorN">0</b></span><span>Suma <b id="sumRech">$0</b></span></div>
+    <table id="tblRech">
+      <thead><tr>
+        <th>Cheque</th>
+        <th style="width:135px;text-align:right">Monto</th>
+        <th style="width:85px;text-align:center">Fecha pago</th>
+        <th style="width:160px">Estado</th>
+        <th style="width:150px">Fecha débito</th>
+        <th style="width:60px;text-align:center">Sist.</th>
+      </tr></thead>
+      <tbody id="bodyRech"></tbody>
+    </table>
+  </div>
+
+  <!-- ===================== INFORME ===================== -->
+  <div id="panel-informe" class="panel" hidden>
+    <div class="filterbar">
+      <span class="lbl">Proveedor</span><div class="ms" id="i_prov"></div>
+      <span class="lbl">Banco</span><div class="ms" id="i_banco"></div>
+      <span class="lbl">Estado</span><div class="ms" id="i_estado"></div>
+      <span class="lbl">Tipo</span><div class="ms" id="i_tipo"></div>
+      <span class="lbl">Temp. pago</span><div class="ms" id="i_temp"></div>
+      <span class="lbl">Clase</span><div class="ms" id="i_clase"></div>
+      <button class="clr" onclick="clearFilters('i')">Limpiar</button>
+    </div>
+    <div class="kpis">
+      <div class="kpi acc"><div class="k">Total del mes</div><div class="v" id="kTot">$0</div></div>
+      <div class="kpi good"><div class="k">Pagado</div><div class="v" id="kPag">$0</div></div>
+      <div class="kpi warnv"><div class="k">Pendiente</div><div class="v" id="kPend">$0</div></div>
+      <div class="kpi bad"><div class="k">Rechazado</div><div class="v" id="kRech">$0</div></div>
+      <div class="kpi teal"><div class="k">Acordado</div><div class="v" id="kAcor">$0</div></div>
+      <div class="kpi"><div class="k">Cheques del mes</div><div class="v" id="kCant">0</div></div>
+    </div>
+    <div class="charts">
+      <div class="chartbox"><h3>Estado del mes</h3><div class="cv"><canvas id="chEstado"></canvas></div></div>
+      <div class="chartbox"><h3>Por banco (mes)</h3><div class="cv"><canvas id="chBanco"></canvas></div></div>
+      <div class="chartbox wide"><h3>Por proveedor (mes)</h3><div class="cv"><canvas id="chProv"></canvas></div></div>
+      <div class="chartbox wide"><h3>Evolución anual — monto por fecha de pago (pagado vs pendiente)</h3><div class="cv"><canvas id="chAnual"></canvas></div></div>
+      <div class="chartbox wide"><h3>Flujo acumulado del año — a pagar vs pagado</h3><div class="cv"><canvas id="chAcum"></canvas></div></div>
+      <div class="chartbox"><h3>Por tipo (mes)</h3><div class="cv"><canvas id="chTipo"></canvas></div></div>
+      <div class="chartbox"><h3>Por clase (mes)</h3><div class="cv"><canvas id="chClase"></canvas></div></div>
+      <div class="chartbox wide"><h3>Cheques por mes (cantidad)</h3><div class="cv"><canvas id="chCant"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- ===================== CHEQUES DIARIOS ===================== -->
+  <div id="panel-diarios" class="panel" hidden>
+    <div class="filterbar">
+      <span class="lbl">Mes/Año</span><div class="ms" id="d_mes"></div>
+      <span class="lbl">Estado</span><div class="ms" id="d_estado"></div>
+      <span class="lbl">Tipo</span><div class="ms" id="d_tipo"></div>
+      <span class="lbl">Proveedor</span><div class="ms" id="d_prov"></div>
+    </div>
+    <div class="sums"><span>Montos por <b>fecha de pago</b></span><span>Días <b id="dDias">0</b></span><span>Total <b id="dTotal">$0</b></span></div>
+    <table id="tblDiarios">
+      <thead><tr>
+        <th style="width:120px">Fecha</th>
+        <th style="text-align:right">MACRO</th>
+        <th style="text-align:right">SANTA FE</th>
+        <th style="text-align:right">GALICIA</th>
+        <th style="text-align:right">Total del día</th>
+      </tr></thead>
+      <tbody id="bodyDiarios"></tbody>
+      <tfoot><tr><td class="tot-lbl">Totales</td><td class="ref" id="dfMacro">$0</td><td class="ref" id="dfSanta">$0</td><td class="ref" id="dfGalicia">$0</td><td class="ref" id="dfTot">$0</td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- ===================== RESUMEN CHEQUES ===================== -->
+  <div id="panel-resumen" class="panel" hidden>
+    <h3 class="rs-h">Tabla 1 — por mes de FECHA DE PAGO</h3>
+    <div class="filterbar">
+      <span class="lbl">Mes/Año</span><div class="ms" id="rs1_mes"></div>
+      <span class="lbl">Estado</span><div class="ms" id="rs1_estado"></div>
+      <span class="lbl">Tipo</span><div class="ms" id="rs1_tipo"></div>
+      <span class="lbl">Proveedor</span><div class="ms" id="rs1_prov"></div>
+    </div>
+    <table id="tblRes1">
+      <thead><tr>
+        <th style="width:130px">Mes / Año</th>
+        <th style="text-align:right">Emitido + Rechazado</th>
+        <th style="text-align:right">Pagado + Acordado + Pedido</th>
+        <th style="text-align:right">Total</th>
+      </tr></thead>
+      <tbody id="bodyRes1"></tbody>
+      <tfoot><tr><td class="tot-lbl">Totales</td><td class="ref" id="r1a">$0</td><td class="ref" id="r1b">$0</td><td class="ref" id="r1t">$0</td></tr></tfoot>
+    </table>
+    <h3 class="rs-h">Tabla 2 — Pagos (pagado + acordado + pedido) por mes de FECHA DE DÉBITO</h3>
+    <div class="filterbar">
+      <span class="lbl">Mes/Año</span><div class="ms" id="rs2_mes"></div>
+      <span class="lbl">Estado</span><div class="ms" id="rs2_estado"></div>
+      <span class="lbl">Tipo</span><div class="ms" id="rs2_tipo"></div>
+      <span class="lbl">Proveedor</span><div class="ms" id="rs2_prov"></div>
+    </div>
+    <table id="tblRes2">
+      <thead><tr><th style="width:130px">Mes / Año</th><th style="text-align:right">Suma pagos</th></tr></thead>
+      <tbody id="bodyRes2"></tbody>
+      <tfoot><tr><td class="tot-lbl">Total</td><td class="ref" id="r2t">$0</td></tr></tfoot>
+    </table>
+    <h3 class="rs-h">Tabla 3 — Diferencia mensual (Tabla 2 por débito − Total Tabla 1 por pago)</h3>
+    <div class="filterbar">
+      <span class="lbl">Mes/Año</span><div class="ms" id="rs3_mes"></div>
+    </div>
+    <table id="tblRes3">
+      <thead><tr><th style="width:130px">Mes / Año</th><th style="text-align:right">Diferencia</th></tr></thead>
+      <tbody id="bodyRes3"></tbody>
+      <tfoot><tr><td class="tot-lbl">Total</td><td class="ref" id="r3t">$0</td></tr></tfoot>
+    </table>
+  </div>
+
+  <!-- ===================== PAGOS DE TEMPORADA ===================== -->
+  <div id="panel-temporada" class="panel" hidden>
+    <div class="filterbar">
+      <span class="lbl">Banco</span><div class="ms" id="pt_banco"></div>
+      <span class="lbl">Tipo</span><div class="ms" id="pt_tipo"></div>
+      <span class="lbl">Mes de pago</span><div class="ms" id="pt_mes"></div>
+      <span class="lbl">Estado</span><div class="ms" id="pt_estado"></div>
+    </div>
+    <div class="sums"><span>Proveedores <b id="ptN">0</b></span><span>% pago total <b id="ptPct">—</b></span></div>
+    <table id="tblTemp">
+      <thead><tr>
+        <th>Proveedor</th>
+        <th style="text-align:right">Emitido + Rechazado</th>
+        <th style="text-align:right">Pagado + Acordado + Pedido</th>
+        <th style="text-align:right">Total</th>
+        <th style="text-align:right;width:90px">% Pago</th>
+      </tr></thead>
+      <tbody id="bodyTemp"></tbody>
+      <tfoot><tr><td class="tot-lbl">Totales</td><td class="ref" id="ptA">$0</td><td class="ref" id="ptB">$0</td><td class="ref" id="ptT">$0</td><td class="ref" id="ptPctF">—</td></tr></tfoot>
+    </table>
+  </div>
+
+  <div class="foot" id="foot">—</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ====== CONFIG ====== */
+const WEBHOOK_READ = "https://pgiacomelli2506.app.n8n.cloud/webhook/cheques-agrupado";  // lectura en vivo de la Google Sheet
+const WEBHOOK_WRITE = "";  // webhook n8n write-back a la planilla (fase posterior).
+
+/* ====== DATOS EMBEBIDOS (snapshot) ====== */
+const SNAPSHOT = /*__DATA__*/{"cheques": [{"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410861, "monto": 1000000, "fEmision": null, "fPago": "2026-02-07", "fDebito": "2026-03-03", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410882, "monto": 500000, "fEmision": "2025-12-27", "fPago": "2026-02-28", "fDebito": "2026-03-03", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "NF", "nCheque": 90410855, "monto": 1000000, "fEmision": "2025-12-10", "fPago": "2026-02-07", "fDebito": "2026-03-04", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410863, "monto": 1000000, "fEmision": null, "fPago": "2026-02-14", "fDebito": "2026-03-05", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410870, "monto": 1000000, "fEmision": null, "fPago": "2026-02-28", "fDebito": "2026-03-05", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410871, "monto": 1000000, "fEmision": null, "fPago": "2026-02-28", "fDebito": "2026-03-05", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410883, "monto": 500000, "fEmision": "2025-12-27", "fPago": "2026-02-28", "fDebito": "2026-03-10", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1095081, "monto": 800000, "fEmision": "2026-01-28", "fPago": "2026-03-07", "fDebito": "2026-03-10", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410879, "monto": 500000, "fEmision": "2025-12-27", "fPago": "2026-02-14", "fDebito": "2026-03-11", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1095112, "monto": 600000, "fEmision": "2026-01-28", "fPago": "2026-03-07", "fDebito": "2026-03-11", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410884, "monto": 1000000, "fEmision": "2025-12-27", "fPago": "2026-03-14", "fDebito": "2026-03-17", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90339971, "monto": 1350000, "fEmision": "2026-02-06", "fPago": "2026-03-14", "fDebito": "2026-03-17", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "VL", "nCheque": 1106104, "monto": 400000, "fEmision": "2026-02-06", "fPago": "2026-03-14", "fDebito": "2026-03-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "VL", "nCheque": 1106097, "monto": 300000, "fEmision": "2026-02-06", "fPago": "2026-03-14", "fDebito": "2026-03-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410869, "monto": 1000000, "fEmision": null, "fPago": "2026-02-28", "fDebito": "2026-03-20", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Sin Fondos", "fPagoReal": "2026-03-20"}, {"banco": "SANTA FE", "proveedor": "VL", "nCheque": 1106111, "monto": 500000, "fEmision": "2026-02-06", "fPago": "2026-03-21", "fDebito": "2026-03-26", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "VL", "nCheque": 1106112, "monto": 300000, "fEmision": "2026-02-06", "fPago": "2026-03-21", "fDebito": "2026-03-26", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660226, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-03-21", "fDebito": "2026-03-27", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660227, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-03-21", "fDebito": "2026-03-27", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "VL", "nCheque": 1106113, "monto": 400000, "fEmision": "2026-02-06", "fPago": "2026-03-21", "fDebito": "2026-03-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410885, "monto": 1000000, "fEmision": "2025-12-27", "fPago": "2026-03-21", "fDebito": "2026-03-30", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625237", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-03-28", "fDebito": "2026-03-31", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625236", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-03-28", "fDebito": "2026-03-31", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90339974, "monto": 1000000, "fEmision": "2026-02-06", "fPago": "2026-03-28", "fDebito": "2026-04-01", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "VL", "nCheque": 1106115, "monto": 500000, "fEmision": "2026-02-06", "fPago": "2026-03-28", "fDebito": "2026-04-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660229, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-03-28", "fDebito": "2026-04-01", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90339973, "monto": 1000000, "fEmision": "2026-02-06", "fPago": "2026-03-21", "fDebito": "2026-04-06", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660228, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-03-28", "fDebito": "2026-04-06", "tipo": "MERC PV-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660233, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-04-25", "fDebito": "2026-04-06", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111524, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-04-04", "fDebito": "2026-04-07", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625266", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-04", "fDebito": "2026-04-07", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625265", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-04", "fDebito": "2026-04-07", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410886, "monto": 1000000, "fEmision": "2025-12-27", "fPago": "2026-03-28", "fDebito": "2026-04-08", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1095106, "monto": 800000, "fEmision": "2026-01-28", "fPago": "2026-04-11", "fDebito": "2026-04-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625298", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-11", "fDebito": "2026-04-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90339972, "monto": 1350000, "fEmision": "2026-02-06", "fPago": "2026-04-11", "fDebito": "2026-04-14", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106031, "monto": 300000, "fEmision": "2026-02-09", "fPago": "2026-04-11", "fDebito": "2026-04-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Otros", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111506, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-04-11", "fDebito": "2026-04-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110070, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-04-11", "fDebito": "2026-04-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381176", "monto": 750000, "fEmision": "2026-03-09", "fPago": "2026-04-11", "fDebito": "2026-04-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625297", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-11", "fDebito": "2026-04-15", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660230, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-04-11", "fDebito": "2026-04-16", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381179", "monto": 750000, "fEmision": "2026-03-09", "fPago": "2026-04-11", "fDebito": "2026-04-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625320", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625319", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106032, "monto": 700000, "fEmision": "2026-02-09", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106039, "monto": 350000, "fEmision": "2026-02-09", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110072, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134214, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134213, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381184", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-18", "fDebito": "2026-04-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216449, "monto": 600000, "fEmision": null, "fPago": "2026-04-11", "fDebito": "2026-04-22", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216450, "monto": 600000, "fEmision": null, "fPago": "2026-04-11", "fDebito": "2026-04-22", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216517, "monto": 600000, "fEmision": null, "fPago": "2026-04-18", "fDebito": "2026-04-22", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216518, "monto": 600000, "fEmision": null, "fPago": "2026-04-18", "fDebito": "2026-04-22", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216519, "monto": 600000, "fEmision": null, "fPago": "2026-04-18", "fDebito": "2026-04-22", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216520, "monto": 600000, "fEmision": null, "fPago": "2026-04-18", "fDebito": "2026-04-22", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381183", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-18", "fDebito": "2026-04-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111509, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-04-18", "fDebito": "2026-04-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381193", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-18", "fDebito": "2026-04-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660231, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-04-18", "fDebito": "2026-04-24", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90339975, "monto": 1000000, "fEmision": "2026-02-06", "fPago": "2026-04-18", "fDebito": "2026-04-27", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381194", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-18", "fDebito": "2026-04-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660232, "monto": 500000, "fEmision": "2026-02-18", "fPago": "2026-04-18", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625339", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106035, "monto": 500000, "fEmision": "2026-02-09", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106034, "monto": 500000, "fEmision": "2026-02-09", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111515, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111512, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110076, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110075, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134217, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134216, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381197", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381198", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-25", "fDebito": "2026-04-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625340", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-04-25", "fDebito": "2026-04-29", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381202", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-25", "fDebito": "2026-04-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381201", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-04-25", "fDebito": "2026-04-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": 65381206, "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-05-02", "fDebito": "2026-05-06", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Embargo", "fPagoReal": "2026-05-06"}, {"banco": "MACRO", "proveedor": "VL", "nCheque": 65753469, "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-02", "fDebito": "2026-05-06", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Embargo", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": 65381209, "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-02", "fDebito": "2026-05-07", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Embargo", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65753529", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-02", "fDebito": "2026-05-07", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Embargo", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381208", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-02", "fDebito": "2026-05-07", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Embargo", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216562, "monto": 600000, "fEmision": null, "fPago": "2026-04-25", "fDebito": "2026-05-08", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381205", "monto": 375000, "fEmision": "2026-03-09", "fPago": "2026-05-02", "fDebito": "2026-05-12", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Embargo", "fPagoReal": "2026-05-11"}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106037, "monto": 500000, "fEmision": "2026-02-09", "fPago": "2026-05-09", "fDebito": "2026-05-12", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185203, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-09", "fDebito": "2026-05-12", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185202, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-09", "fDebito": "2026-05-12", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185201, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-09", "fDebito": "2026-05-12", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185200, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-09", "fDebito": "2026-05-12", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134219, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-05-09", "fDebito": "2026-05-13", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134220, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-05-09", "fDebito": "2026-05-13", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381211", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-09", "fDebito": "2026-05-13", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381212", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-09", "fDebito": "2026-05-13", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1095107, "monto": 900000, "fEmision": "2026-01-28", "fPago": "2026-05-09", "fDebito": "2026-05-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111520, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-05-09", "fDebito": "2026-05-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65753583", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-09", "fDebito": "2026-05-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381216", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-09", "fDebito": "2026-05-15", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381215", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-09", "fDebito": "2026-05-15", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65753645", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-09", "fDebito": "2026-05-15", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111522, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111521, "monto": 500000, "fEmision": "2026-02-12", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134224, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134223, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "JUANITA SHOES", "nCheque": 65381126, "monto": 500000, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "JUANITA SHOES", "nCheque": 65381127, "monto": 500000, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381223", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65753695", "monto": 406127.6, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65753694", "monto": 406127.6, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185214, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185213, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185211, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185210, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-16", "fDebito": "2026-05-19", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110079, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-05-09", "fDebito": "2026-05-20", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625385", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-05-16", "fDebito": "2026-05-20", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381224", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-20", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381228", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625386", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-05-16", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625384", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-05-16", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110082, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-05-16", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "JUANITA SHOES", "nCheque": 1111523, "monto": 218060, "fEmision": "2026-02-12", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "JUANITA SHOES", "nCheque": 65381132, "monto": 500000, "fEmision": "2026-03-09", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "JUANITA SHOES", "nCheque": 65381131, "monto": 500000, "fEmision": "2026-03-09", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592726, "monto": 1000000, "fEmision": "2026-03-28", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185222, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185221, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185220, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518028", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-23", "fDebito": "2026-05-27", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381227", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-16", "fDebito": "2026-05-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381234", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-23", "fDebito": "2026-05-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381233", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-23", "fDebito": "2026-05-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381240", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-23", "fDebito": "2026-05-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518132", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-23", "fDebito": "2026-05-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518133", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-23", "fDebito": "2026-05-28", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625399", "monto": 1000000, "fEmision": "2026-02-03", "fPago": "2026-05-23", "fDebito": "2026-05-29", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1185219, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-23", "fDebito": "2026-05-29", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381241", "monto": 400000, "fEmision": "2026-03-09", "fPago": "2026-05-23", "fDebito": "2026-06-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518176", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-23", "fDebito": "2026-06-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518175", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-23", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625421", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "JUANITA SHOES", "nCheque": 65381134, "monto": 477410, "fEmision": "2026-03-09", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "JUANITA SHOES", "nCheque": 65381135, "monto": 477410, "fEmision": "2026-03-09", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381244", "monto": 406127.6, "fEmision": "2026-03-09", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "65381243", "monto": 406127.6, "fEmision": "2026-03-09", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592727, "monto": 1000000, "fEmision": "2026-03-28", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1186995, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1186994, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1186993, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1186992, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518203", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-30", "fDebito": "2026-06-02", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106038, "monto": 500000, "fEmision": "2026-02-09", "fPago": "2026-05-09", "fDebito": "2026-06-03", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625422", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-05-30", "fDebito": "2026-06-03", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": 64625363, "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-05-09", "fDebito": "2026-06-06", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Embargo", "fPagoReal": "2026-06-06"}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625443", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625444", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592728, "monto": 1000000, "fEmision": "2026-03-28", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "ADORATTA", "nCheque": "66473836", "monto": 500000, "fEmision": "2026-04-22", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518242", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518243", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518244", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518245", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-09", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518282", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-11", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518284", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-11", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518285", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-11", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518283", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-16", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518319", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-16", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518320", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-16", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518321", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-16", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110089, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-05-23", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1110087, "monto": 500000, "fEmision": "2026-02-11", "fPago": "2026-05-23", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518029", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-23", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518322", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-06", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134228, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592729, "monto": 1000000, "fEmision": "2026-03-28", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187046, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189669, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189668, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518459", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518460", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518461", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518462", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-17", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518503", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-18", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518504", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-18", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518505", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-18", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592730, "monto": 1000000, "fEmision": "2026-03-28", "fPago": "2026-06-13", "fDebito": "2026-06-19", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Sin Fondos", "fPagoReal": "2026-06-19"}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625472", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-06-13", "fDebito": "2026-06-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Sin Fondos", "fPagoReal": "2026-06-22"}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187047, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-13", "fDebito": "2026-06-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518557", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518558", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518559", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518560", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518506", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-13", "fDebito": "2026-06-22", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134230, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592731, "monto": 1000000, "fEmision": "2026-03-28", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187051, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187050, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187049, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189674, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189673, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189672, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189671, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64626039", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "ADORATTA", "nCheque": "66473880", "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "ADORATTA", "nCheque": "66473881", "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "ADORATTA", "nCheque": "66473879", "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518610", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518611", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518612", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518613", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-23", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625513", "monto": 712000, "fEmision": "2026-02-03", "fPago": "2026-06-20", "fDebito": "2026-06-24", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518653", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-25", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518654", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-25", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518655", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-25", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518656", "monto": 250000, "fEmision": "2026-04-24", "fPago": "2026-06-20", "fDebito": "2026-06-25", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187052, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-20", "fDebito": "2026-06-26", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518204", "monto": 200000, "fEmision": "2026-04-24", "fPago": "2026-05-30", "fDebito": "2026-06-29", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134232, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187123, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "ADORATTA", "nCheque": "66473915", "monto": 504531.5, "fEmision": "2026-04-22", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187122, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187121, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187120, "monto": 400000, "fEmision": "2026-04-22", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189678, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518746", "monto": 320000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518747", "monto": 320000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518748", "monto": 320000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518749", "monto": 320000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-06-30", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189680, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189679, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518767", "monto": 360000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518768", "monto": 360000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518769", "monto": 360000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518770", "monto": 360000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518771", "monto": 360000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-01", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625545", "monto": 712000, "fEmision": "2026-02-03", "fPago": "2026-06-27", "fDebito": "2026-07-03", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "PREGO", "nCheque": 1189677, "monto": 500000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-07", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 90410891, "monto": 720733.2, "fEmision": "2026-05-12", "fPago": "2026-07-04", "fDebito": "2026-07-07", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90582732, "monto": 400000, "fEmision": "2026-05-01", "fPago": "2026-07-04", "fDebito": "2026-07-07", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592734, "monto": 400000, "fEmision": "2026-05-01", "fPago": "2026-07-04", "fDebito": "2026-07-07", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "ADORATTA", "nCheque": 66473860, "monto": 500000, "fEmision": "2026-04-22", "fPago": "2026-06-13", "fDebito": "2026-07-08", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Sin Fondos", "fPagoReal": "2026-07-08"}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 90410890, "monto": 500000, "fEmision": "2026-05-12", "fPago": "2026-07-04", "fDebito": "2026-07-08", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592733, "monto": 400000, "fEmision": "2026-05-01", "fPago": "2026-07-04", "fDebito": "2026-07-08", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": "66518750", "monto": 320000, "fEmision": "2026-04-24", "fPago": "2026-06-27", "fDebito": "2026-07-13", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592735, "monto": 400000, "fEmision": "2026-05-01", "fPago": "2026-07-04", "fDebito": "2026-07-13", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592736, "monto": 400000, "fEmision": "2026-05-01", "fPago": "2026-07-04", "fDebito": "2026-07-13", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592737, "monto": 400000, "fEmision": "2026-05-01", "fPago": "2026-07-04", "fDebito": "2026-07-14", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625568", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-07-11", "fDebito": "2026-07-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187142, "monto": 425000, "fEmision": "2026-04-22", "fPago": "2026-07-11", "fDebito": "2026-07-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187141, "monto": 425000, "fEmision": "2026-04-22", "fPago": "2026-07-11", "fDebito": "2026-07-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187140, "monto": 425000, "fEmision": "2026-04-22", "fPago": "2026-07-11", "fDebito": "2026-07-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187139, "monto": 425000, "fEmision": "2026-04-22", "fPago": "2026-07-11", "fDebito": "2026-07-14", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592738, "monto": 300000, "fEmision": "2026-05-01", "fPago": "2026-07-11", "fDebito": "2026-07-14", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134239, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-07-11", "fDebito": "2026-07-15", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1134238, "monto": 500000, "fEmision": "2026-03-06", "fPago": "2026-07-11", "fDebito": "2026-07-15", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625473", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-06-13", "fDebito": "2026-07-16", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Sin Fondos", "fPagoReal": "2026-07-16"}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 90410888, "monto": 500000, "fEmision": "2026-05-12", "fPago": "2026-06-27", "fDebito": "2026-07-17", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187160, "monto": 416403.25, "fEmision": "2026-04-22", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625584", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625583", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187158, "monto": 416403.25, "fEmision": "2026-04-22", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187157, "monto": 416403.25, "fEmision": "2026-04-22", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "CB", "nCheque": 1187156, "monto": 416403.25, "fEmision": "2026-04-22", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410892, "monto": 500000, "fEmision": "2026-05-19", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": 67587862, "monto": 350000, "fEmision": "2026-06-10", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "NF", "nCheque": 90410897, "monto": 500000, "fEmision": "2026-06-09", "fPago": "2026-07-18", "fDebito": "2026-07-21", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "NF", "nCheque": 90410889, "monto": 500000, "fEmision": "2026-05-12", "fPago": "2026-06-20", "fDebito": "2026-07-22", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "NF", "nCheque": 90410887, "monto": 500000, "fEmision": "2026-05-12", "fPago": "2026-06-27", "fDebito": "2026-07-22", "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "pagado", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "FG MEDIOS", "nCheque": 63916683, "monto": 1211242.39, "fEmision": "2026-01-02", "fPago": "2026-02-14", "fDebito": null, "tipo": "PUBLICIDAD", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Sin Fondos", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410878, "monto": 1000000, "fEmision": "2025-12-27", "fPago": "2026-03-07", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Sin Fondos", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "FG MEDIOS", "nCheque": 63916709, "monto": 1211242.39, "fEmision": "2026-01-02", "fPago": "2026-03-14", "fDebito": null, "tipo": "PUBLICIDAD", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Embargo", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 1106031, "monto": 350000, "fEmision": "2026-02-06", "fPago": "2026-04-18", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Otros", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "MISTIKA", "nCheque": 65216563, "monto": 600000, "fEmision": null, "fPago": "2026-04-25", "fDebito": null, "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": 64625364, "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-05-09", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "rechazado", "motivo": "Embargo", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90592740, "monto": 300000, "fEmision": "2026-05-01", "fPago": "2026-07-11", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "FAECYS", "nCheque": 3, "monto": 132033, "fEmision": "2026-06-24", "fPago": "2026-07-24", "fDebito": null, "tipo": "IMPUESTOS", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625636", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410893, "monto": 500000, "fEmision": "2026-05-19", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410894, "monto": 500000, "fEmision": "2026-05-19", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587244", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "NF", "nCheque": 90410898, "monto": 400000, "fEmision": "2026-06-09", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036697", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036695", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036696", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-07-25", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587335", "monto": 300000, "fEmision": "2026-06-10", "fPago": "2026-07-31", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "NF", "nCheque": 90410899, "monto": 400000, "fEmision": "2026-06-09", "fPago": "2026-07-31", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036723", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-07-31", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036722", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-07-31", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036721", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-07-31", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587358", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-08-08", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587357", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-08-08", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67839282", "monto": 250000, "fEmision": "2026-06-22", "fPago": "2026-08-08", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67839283", "monto": 250000, "fEmision": "2026-06-22", "fPago": "2026-08-08", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410895, "monto": 500000, "fEmision": "2026-05-19", "fPago": "2026-08-08", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "SANTA FE", "proveedor": "SARA", "nCheque": 90410896, "monto": 300000, "fEmision": "2026-05-19", "fPago": "2026-08-08", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625817", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625816", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587387", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587386", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67839299", "monto": 500000, "fEmision": "2026-06-22", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67859649", "monto": 350000, "fEmision": "2026-06-22", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 11, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 12, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 13, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 14, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-15", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625775", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "LAPOPIE", "nCheque": "64625750", "monto": 500000, "fEmision": "2026-02-03", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587407", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587406", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67839333", "monto": 350000, "fEmision": "2026-06-22", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67839332", "monto": 350000, "fEmision": "2026-06-22", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 15, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 16, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 17, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 18, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 19, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 20, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 21, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 22, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036756", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036757", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036758", "monto": 400000, "fEmision": "2026-06-30", "fPago": "2026-08-22", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "FAECYS", "nCheque": 4, "monto": 132033, "fEmision": "2026-06-24", "fPago": "2026-08-24", "fDebito": null, "tipo": "IMPUESTOS", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67587434", "monto": 400000, "fEmision": "2026-06-10", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67839369", "monto": 293171.7, "fEmision": "2026-06-22", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67839370", "monto": 293171.7, "fEmision": "2026-06-22", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "SARA", "nCheque": "67859657", "monto": 436790.4, "fEmision": "2026-06-22", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660234, "monto": 800000, "fEmision": "2026-06-20", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "NF", "nCheque": 64660235, "monto": 800000, "fEmision": "2026-06-20", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "FISICO", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 23, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 24, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 25, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 26, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 27, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 28, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 29, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": 30, "monto": 250000, "fEmision": "2026-07-15", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036799", "monto": 405315.53, "fEmision": "2026-06-30", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036798", "monto": 405315.53, "fEmision": "2026-06-30", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "CB", "nCheque": "68036800", "monto": 405315.53, "fEmision": "2026-06-30", "fPago": "2026-08-29", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393712", "monto": 450000, "fEmision": "2026-07-17", "fPago": "2026-09-12", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": 6, "monto": 400000, "fEmision": "2026-07-10", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393768", "monto": 366666.67, "fEmision": "2026-07-17", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393769", "monto": 366666.67, "fEmision": "2026-07-17", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393770", "monto": 366666.67, "fEmision": "2026-07-17", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "FAECYS", "nCheque": 5, "monto": 132033, "fEmision": "2026-06-24", "fPago": "2026-09-24", "fDebito": null, "tipo": "IMPUESTOS", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": 7, "monto": 400000, "fEmision": "2026-07-10", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393851", "monto": 492037.75, "fEmision": "2026-07-17", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393848", "monto": 492037.75, "fEmision": "2026-07-17", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393849", "monto": 492037.75, "fEmision": "2026-07-17", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "PREGO", "nCheque": "68393850", "monto": 492037.75, "fEmision": "2026-07-17", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": 8, "monto": 400000, "fEmision": "2026-07-10", "fPago": "2026-10-10", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": 9, "monto": 400000, "fEmision": "2026-07-10", "fPago": "2026-10-17", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": 10, "monto": 400000, "fEmision": "2026-07-10", "fPago": "2026-10-24", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 400000, "fEmision": "2026-07-22", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 400000, "fEmision": "2026-07-22", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 400000, "fEmision": "2026-07-22", "fPago": "2026-10-10", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 400000, "fEmision": "2026-07-22", "fPago": "2026-10-17", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 400000, "fEmision": "2026-07-22", "fPago": "2026-10-24", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-05", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-05", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-05", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-05", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-12", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-12", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-12", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 500000, "fEmision": "2026-07-22", "fPago": "2026-09-12", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-12", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-19", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "VL", "nCheque": null, "monto": 600000, "fEmision": "2026-07-22", "fPago": "2026-09-26", "fDebito": null, "tipo": "MERC OI-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 1500000, "fEmision": "2026-07-22", "fPago": "2026-10-03", "fDebito": null, "tipo": "MERC PV-27", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 1500000, "fEmision": "2026-07-22", "fPago": "2026-10-07", "fDebito": null, "tipo": "MERC PV-27", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "GALICIA", "proveedor": "SARA", "nCheque": null, "monto": 2000000, "fEmision": "2026-07-22", "fPago": "2026-10-10", "fDebito": null, "tipo": "MERC PV-27", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "emitido", "motivo": "", "fPagoReal": null}, {"banco": "MACRO", "proveedor": "VL", "nCheque": 63738031, "monto": 1432784.7, "fEmision": null, "fPago": "2026-01-17", "fDebito": "2026-01-20", "tipo": "MERC PV-26", "clase": "ECHEQ", "temporadaPago": "INV 2026", "base": "acordado", "motivo": "Sin Fondos", "fPagoReal": "2026-02-05"}], "generado": "2026-07-22", "fuente": "35- CONTROL CHEQUES INV 2026.xlsx / pestaña CHEQUES"}/*__END__*/;
+
+/* ====== MODELO ====== */
+const STATES=[["emitido","Emitido"],["pagado","Pagado"],["rechazado","Rechazado"],["pedido","Pedido de Acuerdo"],["acordado","Acordado"]];
+const MOTIVOS=["Sin Fondos","Embargo","Otros"];
+const RECHFAM=new Set(["rechazado","pedido","acordado"]);
+const isPaid=e=>e==="pagado"||e==="acordado"||e==="pedido"; // acordado y pedido de acuerdo cuentan como pago en todo el panel
+const isPaidInf=isPaid;
+
+/* ====== STORAGE ====== */
+const LS_EST="mahra-cheques-estado-v1", LS_MOT="mahra-cheques-motivo-v1", LS_FDEB="mahra-cheques-fdebito-v1", LS_SIS="mahra-cheques-sistema-v1";
+const ovEst=JSON.parse(localStorage.getItem(LS_EST)||"{}");
+const ovMot=JSON.parse(localStorage.getItem(LS_MOT)||"{}");
+const ovFdeb=JSON.parse(localStorage.getItem(LS_FDEB)||"{}");
+const ovSis=JSON.parse(localStorage.getItem(LS_SIS)||"{}");
+const save=(k,o)=>localStorage.setItem(k,JSON.stringify(o));
+
+let DATA=SNAPSHOT, CHEQUES=[];
+const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+let curY, curM;
+
+/* ====== HELPERS ====== */
+function num(v){ if(typeof v==="number")return v; if(v==null)return 0;
+  let s=String(v).replace(/[^\d,.-]/g,""); if(s.indexOf(",")>-1){s=s.replace(/\./g,"").replace(",",".");}
+  const n=parseFloat(s); return isNaN(n)?0:n; }
+// Parser de MONTO: puntos = miles, coma = decimal. Toma el valor tal cual, SIN multiplicar por nada.
+// numero -> tal cual ; "$ 1.000.000" -> 1000000 ; "500000" -> 500000
+function parseMonto(v){
+  if(typeof v==="number")return v;
+  if(v==null)return 0;
+  let s=String(v).replace(/\$/g,"").replace(/\s/g,"").trim();
+  if(!s)return 0;
+  s=s.replace(/\./g,"").replace(",",".");   // quita separador de miles (.) y usa coma como decimal
+  const n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+// Fecha "D/M/AAAA" (o "AAAA-MM-DD") -> ISO "AAAA-MM-DD"
+function toISO(v){
+  if(!v)return "";
+  const s=String(v).trim();
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m)return m[3]+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0");
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m)return s.slice(0,10);
+  return s;
+}
+// Mapea una fila de la Sheet (webhook) al modelo interno del panel
+const _PANELMAP={"emitido":"emitido","pagado":"pagado","rechazado":"rechazado","pedido de acuerdo":"pedido","pedido":"pedido","acordado":"acordado"};
+const _MOTMAP={"sin fondos":"Sin Fondos","embargo":"Embargo","otros":"Otros"};
+function mapRow(r){
+  const est=String(r["ESTADO"]||"").trim();
+  let base=String(r["ESTADO PANEL"]||"").trim().toLowerCase();
+  base=_PANELMAP[base]||(est==="2"?"pagado":"emitido");
+  let mot=String(r["MOTIVO"]||"").trim().toLowerCase();
+  mot=_MOTMAP[mot]||(mot?"Otros":"");
+  return { banco:r["BANCO"], proveedor:r["PROVEEDOR"], nCheque:r["N° CHEQUE"],
+    monto:parseMonto(r["MONTO"]),
+    fEmision:toISO(r["FECHA EMISION"]), fPago:toISO(r["FECHA PAGO"]), fDebito:toISO(r["FECHA DEBITO"]),
+    tipo:r["TIPO"], clase:r["CLASE CHEQUE"], temporadaPago:r["Temporada de Pago"]||"—",
+    base:base, motivo:mot, sistema:/^s/i.test(String(r["PASADO EN SISTEMA"]||"").trim()),
+    rowNumber:r.row_number };
+}
+function fmt(n){ const neg=n<0; n=Math.round(Math.abs(n)); return (neg?"-$ ":"$ ")+n.toLocaleString("es-AR"); }
+function keyOf(c){ return (c.banco||"")+"||"+(c.nCheque||""); }
+function ymOf(s){ return s?s.slice(0,7):null; }
+function today(){ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
+function parseD(s){ if(!s)return null; const p=s.split("-"); return new Date(+p[0],+p[1]-1,+p[2]); }
+function ddmm(s){ if(!s)return "—"; const p=s.split("-"); return p[2]+"/"+p[1]; }
+function ddmmyyyy(s){ if(!s)return "—"; const p=s.split("-"); return p[2]+"/"+p[1]+"/"+p[0]; }
+function monthLabel(ym){ const p=ym.split("-"); return MESES[+p[1]-1].slice(0,3).toLowerCase()+"-"+p[0]; } // feb-2026
+function estadoNum(c){ return (["pagado","acordado","pedido"].includes(estadoEff(c)))?"2":"1"; } // 2 = debitado, 1 = pendiente
+function baseEstado(c){ return c.base||(String(c.estado)==="2"?"pagado":"emitido"); }
+function estadoEff(c){ const k=keyOf(c); return ovEst[k]||baseEstado(c); }
+function motivoEff(c){ const k=keyOf(c); return (k in ovMot)?ovMot[k]:(c.motivo||""); }
+function fdebEff(c){ const k=keyOf(c); return (k in ovFdeb)?ovFdeb[k]:(c.fDebito||""); }
+
+/* ====== CARGA ====== */
+function normalize(d){
+  DATA=d;
+  CHEQUES=(d.cheques||[]).map(c=>({...c, monto:num(c.monto), temporadaPago:c.temporadaPago||"—"}));
+}
+async function loadLive(){
+  if(!WEBHOOK_READ){ toast("Sin webhook configurado — usando datos guardados"); return; }
+  try{
+    const r=await fetch(WEBHOOK_READ,{cache:"no-store"}); const j=await r.json();
+    const rows=(Array.isArray(j)?j:(j.cheques||[])).map(mapRow).filter(c=>c.banco&&String(c.banco).trim()!=="");
+    normalize({cheques:rows,generado:"en vivo "+new Date().toLocaleString("es-AR"),fuente:"Google Sheet · CONTROL CHEQUES AGRUPADO"});
+    buildSelectors(); buildAllFilters(); renderAll(); toast("Actualizado desde la planilla ("+rows.length+" cheques)");
+  }catch(e){ toast("No se pudo leer en vivo — sigo con lo guardado"); }
+}
+
+/* ====== SELECTORES ====== */
+function uniq(f){ return [...new Set(CHEQUES.map(f).filter(x=>x!=null&&x!==""))].sort(); }
+function opts(arr,all="Todos"){ return `<option value="">${all}</option>`+arr.map(x=>`<option>${x}</option>`).join(""); }
+function stOpts(all="Todos"){ return `<option value="">${all}</option>`+STATES.map(([v,l])=>`<option value="${v}">${l}</option>`).join(""); }
+function buildSelectors(){
+  const selM=document.getElementById("selMes"), selA=document.getElementById("selAnio");
+  selM.innerHTML=MESES.map((m,i)=>`<option value="${i}">${m}</option>`).join("");
+  const years=new Set(); CHEQUES.forEach(c=>{ if(c.fPago) years.add(+c.fPago.slice(0,4)); });
+  const now=new Date(); years.add(now.getFullYear());
+  const ys=[...years].sort();
+  selA.innerHTML=ys.map(y=>`<option value="${y}">${y}</option>`).join("");
+  curY=now.getFullYear(); curM=now.getMonth(); if(!ys.includes(curY)) curY=ys[ys.length-1];
+  selM.value=curM; selA.value=curY;
+  selM.onchange=()=>{curM=+selM.value; renderAll();};
+  selA.onchange=()=>{curY=+selA.value; renderAll();};
+}
+function stepMonth(dir){
+  curM+=dir; if(curM<0){curM=11;curY--;} if(curM>11){curM=0;curY++;}
+  const selA=document.getElementById("selAnio");
+  if(![...selA.options].some(o=>+o.value===curY)){ const o=document.createElement("option");o.value=curY;o.textContent=curY;selA.appendChild(o); }
+  document.getElementById("selMes").value=curM; selA.value=curY; renderAll();
+}
+function buildAllFilters(){
+  const provs=uniq(c=>c.proveedor), bancos=uniq(c=>c.banco), tipos=uniq(c=>c.tipo),
+        temps=uniq(c=>c.temporadaPago), clases=uniq(c=>c.clase),
+        anios=uniq(c=>c.fPago?c.fPago.slice(0,4):null);
+  const est5=STATES; // [[v,l]...] 5 estados
+  const rechSt=[["rechazado","Rechazado"],["pedido","Pedido de Acuerdo"],["acordado","Acordado"]];
+  const mesesIdx=MESES.map((m,i)=>[String(i),m]);
+  // Cheques del mes
+  buildMS("m_prov","Proveedor",provs,renderMes);
+  buildMS("m_clase","Clase",clases,renderMes);
+  buildMS("m_estado","Estado",est5,renderMes);
+  buildMS("m_banco","Banco",bancos,renderMes);
+  // Todos
+  buildMS("t_temp","Temp. pago",temps,renderTodos);
+  buildMS("t_mes","Mes",mesesIdx,renderTodos);
+  buildMS("t_anio","Año",anios,renderTodos);
+  buildMS("t_tipo","Tipo",tipos,renderTodos);
+  buildMS("t_prov","Proveedor",provs,renderTodos);
+  buildMS("t_banco","Banco",bancos,renderTodos);
+  buildMS("t_estado","Estado",est5,renderTodos);
+  buildMS("t_clase","Clase",clases,renderTodos);
+  // Rechazados
+  buildMS("r_estado","Estado",rechSt,renderRech);
+  buildMS("r_temp","Temp. pago",temps,renderRech);
+  buildMS("r_motivo","Motivo",MOTIVOS,renderRech);
+  // Informe
+  buildMS("i_prov","Proveedor",provs,renderInforme);
+  buildMS("i_banco","Banco",bancos,renderInforme);
+  buildMS("i_estado","Estado",est5,renderInforme);
+  buildMS("i_tipo","Tipo",tipos,renderInforme);
+  buildMS("i_temp","Temp. pago",temps,renderInforme);
+  buildMS("i_clase","Clase",clases,renderInforme);
+  buildMultiFilters();
+}
+const val=id=>document.getElementById(id).value;
+
+/* ====== MULTI-SELECT (Todos / uno / varios) ====== */
+const MSsel={}; // id -> Set (vacío = Todos)
+function buildMS(id,label,items,onChange){
+  const box=document.getElementById(id); if(!box)return;
+  box.innerHTML=""; MSsel[id]=new Set(); box.classList.add("ms");
+  const btn=document.createElement("button"); btn.className="ms-btn"; box.appendChild(btn);
+  const pop=document.createElement("div"); pop.className="ms-pop"; pop.hidden=true; box.appendChild(pop);
+  function upd(){ btn.textContent=label+": "+(MSsel[id].size===0?"Todos":MSsel[id].size+" sel."); }
+  const all=document.createElement("label"); all.className="ms-item";
+  all.innerHTML='<input type="checkbox" checked> <b>Todos</b>'; pop.appendChild(all);
+  const allCb=all.querySelector("input");
+  allCb.onchange=()=>{ MSsel[id].clear(); pop.querySelectorAll(".ms-v input").forEach(cb=>cb.checked=false); allCb.checked=true; upd(); onChange(); };
+  items.forEach(it=>{ const v=Array.isArray(it)?String(it[0]):String(it), l=Array.isArray(it)?it[1]:it;
+    const lab=document.createElement("label"); lab.className="ms-item ms-v"; lab.innerHTML='<input type="checkbox"> '+l; pop.appendChild(lab);
+    lab.querySelector("input").onchange=function(){ if(this.checked)MSsel[id].add(v); else MSsel[id].delete(v);
+      allCb.checked=MSsel[id].size===0; upd(); onChange(); }; });
+  btn.onclick=(e)=>{ e.stopPropagation(); document.querySelectorAll(".ms-pop").forEach(p=>{if(p!==pop)p.hidden=true;}); pop.hidden=!pop.hidden; };
+  box.addEventListener("click",e=>e.stopPropagation());
+  box._reset=function(){ MSsel[id].clear(); pop.querySelectorAll(".ms-v input").forEach(cb=>cb.checked=false); allCb.checked=true; upd(); };
+  upd();
+}
+document.addEventListener("click",()=>document.querySelectorAll(".ms-pop").forEach(p=>p.hidden=true));
+function msMatch(id,v){ const s=MSsel[id]; return !s||s.size===0||s.has(String(v)); }
+function buildMultiFilters(){
+  const tipos=uniq(c=>c.tipo), provs=uniq(c=>c.proveedor);
+  const est5=[["emitido","Emitido"],["rechazado","Rechazado"],["pagado","Pagado"],["acordado","Acordado"],["pedido","Pedido de Acuerdo"]];
+  const msSet=new Set(); CHEQUES.forEach(c=>{ if(c.fPago)msSet.add(ymOf(c.fPago)); if(c.fDebito)msSet.add(ymOf(c.fDebito)); });
+  const meses=[...msSet].sort().map(m=>[m,monthLabel(m)]);
+  buildMS("d_mes","Mes/Año",meses,renderDiarios);
+  buildMS("d_estado","Estado",est5,renderDiarios);
+  buildMS("d_tipo","Tipo",tipos,renderDiarios);
+  buildMS("d_prov","Proveedor",provs,renderDiarios);
+  buildMS("rs1_mes","Mes/Año",meses,renderResumen);
+  buildMS("rs1_estado","Estado",est5,renderResumen);
+  buildMS("rs1_tipo","Tipo",tipos,renderResumen);
+  buildMS("rs1_prov","Proveedor",provs,renderResumen);
+  buildMS("rs2_mes","Mes/Año",meses,renderResumen);
+  buildMS("rs2_estado","Estado",est5,renderResumen);
+  buildMS("rs2_tipo","Tipo",tipos,renderResumen);
+  buildMS("rs2_prov","Proveedor",provs,renderResumen);
+  buildMS("rs3_mes","Mes/Año",meses,renderResumen);
+  const bancos=uniq(c=>c.banco);
+  buildMS("pt_banco","Banco",bancos,renderPagosTemp);
+  buildMS("pt_tipo","Tipo",tipos,renderPagosTemp);
+  buildMS("pt_mes","Mes de pago",meses,renderPagosTemp);
+  buildMS("pt_estado","Estado",est5,renderPagosTemp);
+}
+
+/* ====== CHEQUES DIARIOS ====== */
+function renderDiarios(){
+  const list=CHEQUES.filter(c=>c.fPago && msMatch("d_mes",ymOf(c.fPago)) && msMatch("d_estado",estadoEff(c)) && msMatch("d_tipo",c.tipo) && msMatch("d_prov",c.proveedor));
+  const byDay={};
+  list.forEach(c=>{ const d=c.fPago; if(!byDay[d])byDay[d]={"MACRO":0,"SANTA FE":0,"GALICIA":0};
+    if(byDay[d][c.banco]!==undefined) byDay[d][c.banco]+=c.monto; });
+  const days=Object.keys(byDay).sort();
+  let tm=0,ts=0,tg=0;
+  const rows=days.map(d=>{ const b=byDay[d], tot=b.MACRO+b["SANTA FE"]+b.GALICIA; tm+=b.MACRO;ts+=b["SANTA FE"];tg+=b.GALICIA;
+    return `<tr><td>${ddmmyyyy(d)}</td><td class="ref">${b.MACRO?fmt(b.MACRO):"—"}</td><td class="ref">${b["SANTA FE"]?fmt(b["SANTA FE"]):"—"}</td><td class="ref">${b.GALICIA?fmt(b.GALICIA):"—"}</td><td class="ref">${fmt(tot)}</td></tr>`; });
+  document.getElementById("bodyDiarios").innerHTML=rows.join("")||`<tr><td colspan="5" class="msg">Sin datos con esos filtros.</td></tr>`;
+  document.getElementById("dDias").textContent=days.length;
+  document.getElementById("dTotal").textContent=fmt(tm+ts+tg);
+  document.getElementById("dfMacro").textContent=fmt(tm);
+  document.getElementById("dfSanta").textContent=fmt(ts);
+  document.getElementById("dfGalicia").textContent=fmt(tg);
+  document.getElementById("dfTot").textContent=fmt(tm+ts+tg);
+}
+
+/* ====== RESUMEN CHEQUES ====== */
+function renderResumen(){
+  const isER=e=>e==="emitido"||e==="rechazado";
+  const isPAP=e=>e==="pagado"||e==="acordado"||e==="pedido";
+  // Tabla 1: por FECHA DE PAGO, filtros propios (rs1)
+  const t1={};
+  CHEQUES.forEach(c=>{ if(!c.fPago)return; const e=estadoEff(c), ym=ymOf(c.fPago);
+    if(!(msMatch("rs1_mes",ym)&&msMatch("rs1_estado",e)&&msMatch("rs1_tipo",c.tipo)&&msMatch("rs1_prov",c.proveedor)))return;
+    if(!t1[ym])t1[ym]={er:0,pap:0};
+    if(isER(e))t1[ym].er+=c.monto; else if(isPAP(e))t1[ym].pap+=c.monto; });
+  // Tabla 2: por FECHA DE DÉBITO, filtros propios (rs2), solo pagos
+  const t2={};
+  CHEQUES.forEach(c=>{ if(!c.fDebito)return; const e=estadoEff(c); if(!isPAP(e))return; const ym=ymOf(c.fDebito);
+    if(!(msMatch("rs2_mes",ym)&&msMatch("rs2_estado",e)&&msMatch("rs2_tipo",c.tipo)&&msMatch("rs2_prov",c.proveedor)))return;
+    t2[ym]=(t2[ym]||0)+c.monto; });
+  // Render Tabla 1
+  const m1=Object.keys(t1).sort(); let sa=0,sb=0;
+  document.getElementById("bodyRes1").innerHTML=m1.map(m=>{ const x=t1[m], tot=x.er+x.pap; sa+=x.er;sb+=x.pap;
+    return `<tr><td>${monthLabel(m)}</td><td class="ref">${fmt(x.er)}</td><td class="ref">${fmt(x.pap)}</td><td class="ref">${fmt(tot)}</td></tr>`; }).join("")||`<tr><td colspan="4" class="msg">Sin datos.</td></tr>`;
+  document.getElementById("r1a").textContent=fmt(sa);
+  document.getElementById("r1b").textContent=fmt(sb);
+  document.getElementById("r1t").textContent=fmt(sa+sb);
+  // Render Tabla 2
+  const m2=Object.keys(t2).sort(); let s2=0;
+  document.getElementById("bodyRes2").innerHTML=m2.map(m=>{ const v=t2[m]; s2+=v;
+    return `<tr><td>${monthLabel(m)}</td><td class="ref">${fmt(v)}</td></tr>`; }).join("")||`<tr><td colspan="2" class="msg">Sin datos.</td></tr>`;
+  document.getElementById("r2t").textContent=fmt(s2);
+  // Render Tabla 3: T2(débito) − T1total(pago) por mes, filtro propio de mes (rs3)
+  const m3=[...new Set([...m1,...m2])].sort().filter(m=>msMatch("rs3_mes",m));
+  let s3=0;
+  document.getElementById("bodyRes3").innerHTML=m3.map(m=>{ const t1tot=(t1[m]?t1[m].er+t1[m].pap:0), diff=(t2[m]||0)-t1tot; s3+=diff;
+    return `<tr><td>${monthLabel(m)}</td><td class="ref ${diff<0?"neg":""}">${fmt(diff)}</td></tr>`; }).join("")||`<tr><td colspan="2" class="msg">Sin datos.</td></tr>`;
+  document.getElementById("r3t").textContent=fmt(s3);
+  document.getElementById("r3t").className="ref"+(s3<0?" neg":"");
+}
+
+/* ====== PAGOS DE TEMPORADA ====== */
+function renderPagosTemp(){
+  const isER=e=>e==="emitido"||e==="rechazado";
+  const isPAP=e=>e==="pagado"||e==="acordado"||e==="pedido";
+  const list=CHEQUES.filter(c=>msMatch("pt_banco",c.banco)&&msMatch("pt_tipo",c.tipo)&&msMatch("pt_mes",c.fPago?ymOf(c.fPago):"")&&msMatch("pt_estado",estadoEff(c)));
+  const byP={};
+  list.forEach(c=>{ const p=c.proveedor||"—", e=estadoEff(c); if(!byP[p])byP[p]={er:0,pap:0};
+    if(isER(e))byP[p].er+=c.monto; else if(isPAP(e))byP[p].pap+=c.monto; });
+  const provs=Object.keys(byP).sort();
+  let ta=0,tb=0;
+  document.getElementById("bodyTemp").innerHTML=provs.map(p=>{ const x=byP[p], tot=x.er+x.pap, pct=tot?x.pap/tot*100:0; ta+=x.er;tb+=x.pap;
+    const full=(tot>0 && Math.round(pct)>=100);
+    return `<tr class="${full?"pt-full":""}"><td class="chq">${p}</td><td class="ref">${fmt(x.er)}</td><td class="ref">${fmt(x.pap)}</td><td class="ref">${fmt(tot)}</td><td class="ref">${tot?pct.toFixed(1)+"%":"—"}</td></tr>`; }).join("")||`<tr><td colspan="5" class="msg">Sin datos con esos filtros.</td></tr>`;
+  const tt=ta+tb, tpct=tt?tb/tt*100:0;
+  document.getElementById("ptN").textContent=provs.length;
+  document.getElementById("ptA").textContent=fmt(ta);
+  document.getElementById("ptB").textContent=fmt(tb);
+  document.getElementById("ptT").textContent=fmt(tt);
+  document.getElementById("ptPct").textContent=tt?tpct.toFixed(1)+"%":"—";
+  document.getElementById("ptPctF").textContent=tt?tpct.toFixed(1)+"%":"—";
+}
+function clearFilters(pfx){
+  document.querySelectorAll('.ms[id^="'+pfx+'_"]').forEach(box=>{ if(box._reset)box._reset(); });
+  document.querySelectorAll('input[id^="'+pfx+'_"]').forEach(el=>{ el.value=""; });
+  if(pfx==="m")renderMes(); if(pfx==="t")renderTodos(); if(pfx==="r")renderRech(); if(pfx==="i")renderInforme();
+}
+
+/* ====== FILTRO GENERICO ====== */
+function pass(c,f){
+  if(f.prov&&c.proveedor!==f.prov)return false;
+  if(f.banco&&c.banco!==f.banco)return false;
+  if(f.estado&&estadoEff(c)!==f.estado)return false;
+  if(f.tipo&&c.tipo!==f.tipo)return false;
+  if(f.temp&&c.temporadaPago!==f.temp)return false;
+  if(f.clase&&c.clase!==f.clase)return false;
+  if(f.motivo&&motivoEff(c)!==f.motivo)return false;
+  if(f.mes!==""&&f.mes!=null){ if(!c.fPago||(+c.fPago.slice(5,7)-1)!==+f.mes)return false; }
+  if(f.anio&&(!c.fPago||c.fPago.slice(0,4)!==String(f.anio)))return false;
+  if(f.buscar&&!String(c.nCheque||"").includes(f.buscar))return false;
+  return true;
+}
+
+/* ====== FILA ====== */
+function rowCheque(c){
+  const k=keyOf(c), e=estadoEff(c);
+  const badge=(c.clase==="ECHEQ"?'<span class="badge b-echeq">e-cheq</span>':(c.clase==="FISICO"?'<span class="badge b-fisico">físico</span>':""))
+    +(c.temporadaPago&&c.temporadaPago!=="—"?`<span class="badge b-temp">${c.temporadaPago}</span>`:"");
+  const stO=STATES.map(([v,l])=>`<option value="${v}" ${v===e?"selected":""}>${l}</option>`).join("");
+  let motSel="";
+  if(RECHFAM.has(e)){ const m=motivoEff(c);
+    motSel=`<select class="mot-sel" onchange="setMot('${k}',this.value)"><option value="">— motivo —</option>`
+      +MOTIVOS.map(x=>`<option ${x===m?"selected":""}>${x}</option>`).join("")+`</select>`; }
+  const d=parseD(c.fPago); let cls="";
+  if(e==="emitido"&&d){ const diff=(d-today())/86400000; if(diff<0)cls="venc"; else if(diff<=7)cls="prox"; }
+  return `<tr>
+    <td class="chq">${c.proveedor||"—"} ${badge}<span class="sub">N° ${c.nCheque||"—"} · ${c.banco||""} · ${c.tipo||""}</span></td>
+    <td class="ref">${fmt(c.monto)}</td>
+    <td class="vto ${cls}"><span class="d">${ddmm(c.fPago)}</span></td>
+    <td><select class="st-sel st-${e}" onchange="setEstado('${k}',this.value)">${stO}</select>${motSel}</td>
+    <td><input type="date" class="fch-in" value="${fdebEff(c)}" onchange="setFdeb('${k}',this.value)"></td>
+    <td style="text-align:center"><input type="checkbox" class="chk" ${((k in ovSis)?ovSis[k]:c.sistema)?"checked":""} onchange="setSis('${k}',this.checked)" title="Pasado en EcommApp (lo marca la automatización)"></td>
+  </tr>`;
+}
+
+/* ====== CHEQUES DEL MES ====== */
+function filtMes(){
+  const ym=`${curY}-${String(curM+1).padStart(2,"0")}`;
+  return CHEQUES.filter(c=>ymOf(c.fPago)===ym && msMatch("m_prov",c.proveedor) && msMatch("m_clase",c.clase) && msMatch("m_estado",estadoEff(c)) && msMatch("m_banco",c.banco));
+}
+function renderMes(){
+  const list=filtMes(); const body=document.getElementById("bodyMes");
+  const msg=document.getElementById("msgMes"), tbl=document.getElementById("tblMes");
+  if(!list.length){ msg.textContent="No hay cheques para este mes con esos filtros."; msg.hidden=false; tbl.hidden=true; }
+  else{ msg.hidden=true; tbl.hidden=false; list.sort((a,b)=>(a.fPago||"").localeCompare(b.fPago||"")); body.innerHTML=list.map(rowCheque).join(""); }
+  let tot=0,pag=0,pend=0,nPag=0;
+  list.forEach(c=>{ tot+=c.monto; const e=estadoEff(c); if(isPaid(e)){pag+=c.monto;nPag++;} else if(e==="emitido")pend+=c.monto; });
+  document.getElementById("footMes").textContent=fmt(tot);
+  document.getElementById("cntPag").textContent=`${nPag} / ${list.length}`;
+  document.getElementById("fillPag").style.width=(list.length?100*nPag/list.length:0)+"%";
+  document.getElementById("totPag").textContent=fmt(pag);
+  document.getElementById("totPend").textContent=fmt(pend);
+  const t=today(); let venc=0,vN=0,prox=0,pN=0;
+  list.forEach(c=>{ if(estadoEff(c)!=="emitido")return; const d=parseD(c.fPago); if(!d)return;
+    const diff=(d-t)/86400000; if(diff<0){venc+=c.monto;vN++;} else if(diff<=7){prox+=c.monto;pN++;} });
+  document.getElementById("alVenc").textContent=fmt(venc); document.getElementById("alVencN").textContent=vN+" cheques";
+  document.getElementById("alProx").textContent=fmt(prox); document.getElementById("alProxN").textContent=pN+" cheques";
+  document.getElementById("alMes").textContent=fmt(tot); document.getElementById("alMesN").textContent=list.length+" cheques";
+}
+
+/* ====== TODOS ====== */
+function filtTodos(){
+  const buscar=(document.getElementById("t_buscar").value||"").trim();
+  return CHEQUES.filter(c=>{
+    if(!(msMatch("t_temp",c.temporadaPago)&&msMatch("t_tipo",c.tipo)&&msMatch("t_prov",c.proveedor)&&msMatch("t_banco",c.banco)&&msMatch("t_estado",estadoEff(c))&&msMatch("t_clase",c.clase)))return false;
+    if(!msMatch("t_mes", c.fPago?String(+c.fPago.slice(5,7)-1):""))return false;
+    if(!msMatch("t_anio", c.fPago?c.fPago.slice(0,4):""))return false;
+    if(buscar&&!String(c.nCheque||"").includes(buscar))return false;
+    return true; });
+}
+function renderTodos(){
+  const list=filtTodos(); list.sort((a,b)=>(b.fPago||"").localeCompare(a.fPago||""));
+  document.getElementById("bodyTodos").innerHTML=list.map(rowCheque).join("")||`<tr><td colspan="6" class="msg">Sin resultados.</td></tr>`;
+  document.getElementById("cntTodos").textContent=list.length;
+  document.getElementById("sumTodos").textContent=fmt(list.reduce((s,c)=>s+c.monto,0));
+  const t=today(); let venc=0,vN=0,pag=0,pN=0,rech=0,rN=0,acor=0,aN=0,ped=0,pdN=0,sinv=0,sN=0;
+  list.forEach(c=>{ const e=estadoEff(c), d=parseD(c.fPago);
+    if(e==="pagado"){pag+=c.monto;pN++;}
+    else if(e==="acordado"){acor+=c.monto;aN++;}
+    else if(e==="pedido"){ped+=c.monto;pdN++;}
+    else if(e==="rechazado"){rech+=c.monto;rN++;}
+    else if(e==="emitido"){ if(d&&d<t){venc+=c.monto;vN++;} else {sinv+=c.monto;sN++;} }
+  });
+  const S=(id,v,n)=>{document.getElementById(id).textContent=fmt(v);document.getElementById(id+"N").textContent=n+" cheques";};
+  S("tVenc",venc,vN); S("tPag",pag,pN); S("tRech",rech,rN); S("tAcor",acor,aN); S("tPed",ped,pdN); S("tSinV",sinv,sN);
+}
+
+/* ====== RECHAZADOS / ACUERDOS ====== */
+function filtRech(){
+  return CHEQUES.filter(c=>{ const e=estadoEff(c); if(!RECHFAM.has(e))return false;
+    return msMatch("r_estado",e) && msMatch("r_temp",c.temporadaPago) && msMatch("r_motivo",motivoEff(c)); });
+}
+function renderRech(){
+  const list=filtRech(); list.sort((a,b)=>(b.fPago||"").localeCompare(a.fPago||""));
+  document.getElementById("bodyRech").innerHTML=list.map(rowCheque).join("")||`<tr><td colspan="6" class="msg">Sin cheques rechazados / acordados.</td></tr>`;
+  let r=0,p=0,a=0,sum=0;
+  list.forEach(c=>{ const e=estadoEff(c); sum+=c.monto; if(e==="rechazado")r++; else if(e==="pedido")p++; else if(e==="acordado")a++; });
+  document.getElementById("rRechN").textContent=r; document.getElementById("rPedN").textContent=p;
+  document.getElementById("rAcorN").textContent=a; document.getElementById("sumRech").textContent=fmt(sum);
+}
+
+/* ====== ACCIONES ====== */
+function setEstado(k,v){ ovEst[k]=v; save(LS_EST,ovEst); refreshActive(); if(v==="pagado"||v==="acordado")maybeWriteBack(k,v); }
+function setMot(k,v){ if(v)ovMot[k]=v; else delete ovMot[k]; save(LS_MOT,ovMot); refreshActive(); }
+function setFdeb(k,v){ ovFdeb[k]=v; save(LS_FDEB,ovFdeb); }
+function setSis(k,v){ if(v)ovSis[k]=true; else delete ovSis[k]; save(LS_SIS,ovSis); }
+function maybeWriteBack(k,v){ if(!WEBHOOK_WRITE)return; const c=CHEQUES.find(x=>keyOf(x)===k); if(!c)return;
+  fetch(WEBHOOK_WRITE,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({banco:c.banco,nCheque:c.nCheque,estado:v,motivo:motivoEff(c),fDebito:fdebEff(c)})}).catch(()=>{}); }
+function refreshActive(){
+  if(!document.getElementById("panel-mes").hidden)renderMes();
+  if(!document.getElementById("panel-todos").hidden)renderTodos();
+  if(!document.getElementById("panel-rech").hidden)renderRech();
+  if(!document.getElementById("panel-informe").hidden)renderInforme();
+}
+
+/* ====== TABS ====== */
+function showTab(t){
+  ["mes","todos","rech","informe","diarios","resumen","temporada"].forEach(x=>{
+    document.getElementById("panel-"+x).hidden=(x!==t);
+    document.getElementById("tb-"+(x==="informe"?"inf":x)).classList.toggle("active",x===t);
+  });
+  if(t==="mes")renderMes(); if(t==="todos")renderTodos(); if(t==="rech")renderRech(); if(t==="informe")renderInforme();
+  if(t==="diarios")renderDiarios(); if(t==="resumen")renderResumen(); if(t==="temporada")renderPagosTemp();
+}
+
+/* ====== INFORME ====== */
+let charts={};
+function mkChart(id,cfg){ if(charts[id])charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
+const GRID="#2a3550", TX="#93a0bb";
+const PAL={emitido:"#93a0bb",pagado:"#3fd08a",rechazado:"#f2685f",pedido:"#f5b64b",acordado:"#39d3c0",acc:"#4f8cff",pur:"#a98bff",warn:"#f5b64b"};
+function filtInforme(){
+  return CHEQUES.filter(c=>msMatch("i_prov",c.proveedor)&&msMatch("i_banco",c.banco)&&msMatch("i_estado",estadoEff(c))&&msMatch("i_tipo",c.tipo)&&msMatch("i_temp",c.temporadaPago)&&msMatch("i_clase",c.clase));
+}
+function renderInforme(){
+  const base=filtInforme();
+  const ym=`${curY}-${String(curM+1).padStart(2,"0")}`;
+  const list=base.filter(c=>ymOf(c.fPago)===ym);
+  let tot=0,pag=0,pend=0,rech=0,acor=0;
+  list.forEach(c=>{ tot+=c.monto; const e=estadoEff(c);
+    if(isPaidInf(e))pag+=c.monto;               // pagado + acordado + pedido de acuerdo
+    if(e==="acordado")acor+=c.monto;            // detalle acordado
+    else if(e==="rechazado")rech+=c.monto;
+    else if(e==="emitido")pend+=c.monto; });
+  document.getElementById("kTot").textContent=fmt(tot);
+  document.getElementById("kPag").textContent=fmt(pag);
+  document.getElementById("kPend").textContent=fmt(pend);
+  document.getElementById("kRech").textContent=fmt(rech);
+  document.getElementById("kAcor").textContent=fmt(acor);
+  document.getElementById("kCant").textContent=list.length;
+
+  const est={emitido:0,pagado:0,rechazado:0,pedido:0,acordado:0};
+  list.forEach(c=>est[estadoEff(c)]+=c.monto);
+  mkChart("chEstado",{type:"doughnut",
+    data:{labels:["Emitido","Pagado","Rechazado","Pedido","Acordado"],datasets:[{data:[est.emitido,est.pagado,est.rechazado,est.pedido,est.acordado],
+      backgroundColor:[PAL.emitido,PAL.pagado,PAL.rechazado,PAL.pedido,PAL.acordado],borderColor:"#171e2e",borderWidth:2}]},
+    options:{plugins:{legend:{labels:{color:TX,boxWidth:12}}},cutout:"60%"}});
+
+  const grp=(f)=>{const o={};list.forEach(c=>o[f(c)]=(o[f(c)]||0)+c.monto);return o;};
+  const banco=grp(c=>c.banco);
+  mkChart("chBanco",{type:"bar",data:{labels:Object.keys(banco),datasets:[{data:Object.values(banco),backgroundColor:PAL.acc,borderRadius:5}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:TX},grid:{display:false}},y:{ticks:{color:TX},grid:{color:GRID}}}}});
+
+  const prov=Object.entries(grp(c=>c.proveedor)).sort((a,b)=>b[1]-a[1]);
+  mkChart("chProv",{type:"bar",data:{labels:prov.map(e=>e[0]),datasets:[{data:prov.map(e=>e[1]),backgroundColor:PAL.pur,borderRadius:5}]},
+    options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:TX},grid:{color:GRID}},y:{ticks:{color:TX},grid:{display:false}}}}});
+
+  const tipo=Object.entries(grp(c=>c.tipo||"—")).sort((a,b)=>b[1]-a[1]);
+  mkChart("chTipo",{type:"doughnut",data:{labels:tipo.map(e=>e[0]),datasets:[{data:tipo.map(e=>e[1]),
+      backgroundColor:[PAL.acc,PAL.pur,PAL.warn,PAL.acordado,PAL.rechazado,PAL.emitido],borderColor:"#171e2e",borderWidth:2}]},
+    options:{plugins:{legend:{labels:{color:TX,boxWidth:12}}},cutout:"58%"}});
+
+  const clase=grp(c=>c.clase||"—");
+  mkChart("chClase",{type:"doughnut",data:{labels:Object.keys(clase),datasets:[{data:Object.values(clase),
+      backgroundColor:[PAL.acc,PAL.pur,PAL.warn],borderColor:"#171e2e",borderWidth:2}]},
+    options:{plugins:{legend:{labels:{color:TX,boxWidth:12}}},cutout:"60%"}});
+
+  const mPag=Array(12).fill(0),mPend=Array(12).fill(0),mCant=Array(12).fill(0),mTot=Array(12).fill(0);
+  base.forEach(c=>{ if(!c.fPago||+c.fPago.slice(0,4)!==curY)return; const m=+c.fPago.slice(5,7)-1; const e=estadoEff(c);
+    mCant[m]++; mTot[m]+=c.monto; if(isPaidInf(e))mPag[m]+=c.monto; else if(e==="emitido")mPend[m]+=c.monto; });
+  mkChart("chAnual",{type:"line",data:{labels:MESES.map(m=>m.slice(0,3)),datasets:[
+      {label:"Pagado",data:mPag,borderColor:PAL.pagado,backgroundColor:"rgba(63,208,138,.12)",fill:true,tension:.3},
+      {label:"Pendiente",data:mPend,borderColor:PAL.warn,backgroundColor:"rgba(245,182,75,.10)",fill:true,tension:.3}]},
+    options:{plugins:{legend:{labels:{color:TX}}},scales:{x:{ticks:{color:TX},grid:{display:false}},y:{ticks:{color:TX},grid:{color:GRID}}}}});
+
+  let acTot=0,acPag=0; const cumTot=[],cumPag=[];
+  for(let m=0;m<12;m++){ acTot+=mTot[m]; acPag+=mPag[m]; cumTot.push(acTot); cumPag.push(acPag); }
+  mkChart("chAcum",{type:"line",data:{labels:MESES.map(m=>m.slice(0,3)),datasets:[
+      {label:"A pagar (acumulado)",data:cumTot,borderColor:PAL.acc,backgroundColor:"rgba(79,140,255,.10)",fill:true,tension:.3},
+      {label:"Pagado (acumulado)",data:cumPag,borderColor:PAL.pagado,backgroundColor:"rgba(63,208,138,.10)",fill:true,tension:.3}]},
+    options:{plugins:{legend:{labels:{color:TX}}},scales:{x:{ticks:{color:TX},grid:{display:false}},y:{ticks:{color:TX},grid:{color:GRID}}}}});
+
+  mkChart("chCant",{type:"bar",data:{labels:MESES.map(m=>m.slice(0,3)),datasets:[{data:mCant,backgroundColor:PAL.acc,borderRadius:4}]},
+    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:TX},grid:{display:false}},y:{ticks:{color:TX},grid:{color:GRID}}}}});
+}
+
+/* ====== LISTENERS ====== */
+document.addEventListener("input",e=>{if(e.target.id==="t_buscar")renderTodos();});
+
+/* ====== INIT ====== */
+function renderAll(){ renderMes();
+  if(!document.getElementById("panel-todos").hidden)renderTodos();
+  if(!document.getElementById("panel-rech").hidden)renderRech();
+  if(!document.getElementById("panel-informe").hidden)renderInforme(); }
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+(function init(){
+  normalize(SNAPSHOT); buildSelectors(); buildAllFilters(); renderAll();
+  document.getElementById("foot").textContent=`Fuente: ${DATA.fuente||"planilla"} · snapshot ${DATA.generado||""} · ${CHEQUES.length} cheques`;
+  if(WEBHOOK_READ) loadLive();
+})();
+</script>
+</body>
+</html>
