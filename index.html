@@ -192,6 +192,7 @@
       <thead><tr>
         <th>Cheque</th>
         <th style="width:135px;text-align:right">Monto</th>
+        <th class="sortable" style="width:85px;text-align:center" onclick="toggleSort('todosEmis')" title="Ordenar por fecha de emisión">F. emisión <span class="ar" id="sortTodosEmis"></span></th>
         <th class="sortable" style="width:85px;text-align:center" onclick="toggleSort('todos')" title="Ordenar por fecha de pago">Fecha pago <span class="ar" id="sortTodos"></span></th>
         <th style="width:160px">Estado</th>
         <th style="width:150px">Fecha débito</th>
@@ -648,7 +649,7 @@ function pass(c,f){
 }
 
 /* ====== FILA ====== */
-function rowCheque(c){
+function rowCheque(c,emisCol){
   const k=keyOf(c), e=estadoEff(c);
   const badge=(c.clase==="ECHEQ"?'<span class="badge b-echeq">e-cheq</span>':(c.clase==="FISICO"?'<span class="badge b-fisico">físico</span>':""))
     +(c.temporadaPago&&c.temporadaPago!=="—"?`<span class="badge b-temp">${c.temporadaPago}</span>`:"");
@@ -659,9 +660,14 @@ function rowCheque(c){
       +MOTIVOS.map(x=>`<option ${x===m?"selected":""}>${x}</option>`).join("")+`</select>`; }
   const d=parseD(c.fPago); let cls="";
   if(e==="emitido"&&d){ const diff=(d-today())/86400000; if(diff<0)cls="venc"; else if(diff<=7)cls="prox"; }
+  const sub = emisCol
+    ? `N° ${c.nCheque||"—"} · ${c.banco||""} · ${c.tipo||""}`
+    : `N° ${c.nCheque||"—"} · ${c.banco||""} · ${c.tipo||""} · emis ${c.fEmision?ddmmyyyy(c.fEmision):"—"}`;
+  const emisTd = emisCol ? `<td class="vto"><span class="d">${ddmm(c.fEmision)}</span></td>` : "";
   return `<tr>
-    <td class="chq">${c.proveedor||"—"} ${badge}<span class="sub">N° ${c.nCheque||"—"} · ${c.banco||""} · ${c.tipo||""} · emis ${c.fEmision?ddmmyyyy(c.fEmision):"—"}</span></td>
+    <td class="chq">${c.proveedor||"—"} ${badge}<span class="sub">${sub}</span></td>
     <td class="ref">${fmt(c.monto)}</td>
+    ${emisTd}
     <td class="vto ${cls}"><span class="d">${ddmm(c.fPago)}</span></td>
     <td><select class="st-sel st-${e}" onchange="setEstado('${k}',this.value)">${stO}</select>${motSel}</td>
     <td><input type="date" class="fch-in" value="${fdebEff(c)}" onchange="setFdeb('${k}',this.value)"></td>
@@ -670,13 +676,18 @@ function rowCheque(c){
 }
 
 /* ====== ORDEN POR FECHA (asc/desc) ====== */
-const sortDir={mes:1,todos:-1,rech:-1,diarios:1,res:1}; // 1 asc, -1 desc
-function toggleSort(key){ sortDir[key]=-sortDir[key];
-  if(key==="mes")renderMes(); else if(key==="todos")renderTodos(); else if(key==="rech")renderRech();
+const sortDir={mes:1,todos:-1,todosEmis:-1,rech:-1,diarios:1,res:1}; // 1 asc, -1 desc
+let todosSortBy="pago"; // "pago" | "emis" — columna activa de orden en la pestaña Todos
+function toggleSort(key){
+  if(key==="todos"){ todosSortBy="pago"; sortDir.todos=-sortDir.todos; renderTodos(); return; }
+  if(key==="todosEmis"){ todosSortBy="emis"; sortDir.todosEmis=-sortDir.todosEmis; renderTodos(); return; }
+  sortDir[key]=-sortDir[key];
+  if(key==="mes")renderMes(); else if(key==="rech")renderRech();
   else if(key==="diarios")renderDiarios(); else if(key==="res")renderResumen(); }
 function sortArrow(key){ return sortDir[key]===1?"▲":"▼"; }
 function setArrow(id,key){ const el=document.getElementById(id); if(el)el.textContent=sortArrow(key); }
 const cmpF=(dir)=>((a,b)=>((a.fPago||"").localeCompare(b.fPago||""))*dir);   // por fecha de pago
+const cmpFEmis=(dir)=>((a,b)=>((a.fEmision||"").localeCompare(b.fEmision||""))*dir); // por fecha de emisión
 const cmpS=(dir)=>((a,b)=>(String(a).localeCompare(String(b)))*dir);         // por string (fecha/mes)
 
 /* ====== CHEQUES DEL MES ====== */
@@ -688,7 +699,7 @@ function renderMes(){
   const list=filtMes(); const body=document.getElementById("bodyMes");
   const msg=document.getElementById("msgMes"), tbl=document.getElementById("tblMes");
   if(!list.length){ msg.textContent="No hay cheques para este mes con esos filtros."; msg.hidden=false; tbl.hidden=true; }
-  else{ msg.hidden=true; tbl.hidden=false; list.sort(cmpF(sortDir.mes)); body.innerHTML=list.map(rowCheque).join(""); }
+  else{ msg.hidden=true; tbl.hidden=false; list.sort(cmpF(sortDir.mes)); body.innerHTML=list.map(c=>rowCheque(c)).join(""); }
   setArrow("sortMes","mes");
   let tot=0,pag=0,pend=0,nPag=0;
   list.forEach(c=>{ tot+=c.monto; const e=estadoEff(c); if(isPaid(e)){pag+=c.monto;nPag++;} else if(e==="emitido")pend+=c.monto; });
@@ -717,8 +728,12 @@ function filtTodos(){
     return true; });
 }
 function renderTodos(){
-  const list=filtTodos(); list.sort(cmpF(sortDir.todos)); setArrow("sortTodos","todos");
-  document.getElementById("bodyTodos").innerHTML=list.map(rowCheque).join("")||`<tr><td colspan="6" class="msg">Sin resultados.</td></tr>`;
+  const list=filtTodos();
+  if(todosSortBy==="emis") list.sort(cmpFEmis(sortDir.todosEmis)); else list.sort(cmpF(sortDir.todos));
+  const arPago=document.getElementById("sortTodos"), arEmis=document.getElementById("sortTodosEmis");
+  if(arPago) arPago.textContent=(todosSortBy==="pago")?sortArrow("todos"):"";
+  if(arEmis) arEmis.textContent=(todosSortBy==="emis")?sortArrow("todosEmis"):"";
+  document.getElementById("bodyTodos").innerHTML=list.map(c=>rowCheque(c,true)).join("")||`<tr><td colspan="7" class="msg">Sin resultados.</td></tr>`;
   document.getElementById("cntTodos").textContent=list.length;
   document.getElementById("sumTodos").textContent=fmt(list.reduce((s,c)=>s+c.monto,0));
   const t=today(); let venc=0,vN=0,pag=0,pN=0,rech=0,rN=0,acor=0,aN=0,ped=0,pdN=0,sinv=0,sN=0;
@@ -740,7 +755,7 @@ function filtRech(){
 }
 function renderRech(){
   const list=filtRech(); list.sort(cmpF(sortDir.rech)); setArrow("sortRech","rech");
-  document.getElementById("bodyRech").innerHTML=list.map(rowCheque).join("")||`<tr><td colspan="6" class="msg">Sin cheques rechazados / acordados.</td></tr>`;
+  document.getElementById("bodyRech").innerHTML=list.map(c=>rowCheque(c)).join("")||`<tr><td colspan="6" class="msg">Sin cheques rechazados / acordados.</td></tr>`;
   let r=0,p=0,a=0,sum=0;
   list.forEach(c=>{ const e=estadoEff(c); sum+=c.monto; if(e==="rechazado")r++; else if(e==="pedido")p++; else if(e==="acordado")a++; });
   document.getElementById("rRechN").textContent=r; document.getElementById("rPedN").textContent=p;
